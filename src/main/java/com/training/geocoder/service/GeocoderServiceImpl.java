@@ -96,7 +96,6 @@ public class GeocoderServiceImpl implements GeocoderService {
                     throw new ServiceException("The request did not encounter any errors, but returned no results");
                 }
                 GeocodingResult result = results[FIRST_ELEMENT];
-                System.out.println(result);
 
                 if (result != null) {
                     String formattedAddress = createFormattedAddress(result);

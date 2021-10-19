@@ -19,7 +19,6 @@ public class GeocoderController {
 
     @PostMapping("/coordinates")
     public AddressDTO getAddressDTO(@RequestBody CoordinatesDTO coordinates) {
-        System.out.println(coordinates);
         try {
             return geocoderService.reverseGeocode(coordinates);
         } catch (ServiceException e) {
@@ -29,7 +28,6 @@ public class GeocoderController {
 
     @PostMapping("/address")
     public CoordinatesDTO getCoordinatesDTO(@RequestBody AddressDTO address) {
-        System.out.println(address);
         try {
             return geocoderService.geocode(address);
         } catch (ServiceException e) {
