@@ -36,7 +36,6 @@ public class GeocoderServiceImpl implements GeocoderService {
     @Override
     @Cacheable("coordinatesDTO")
     public CoordinatesDTO geocode(AddressDTO addressDTO) throws ServiceException {
-        System.out.println(1);
         CoordinatesDTO coordinatesDTO;
 
         try {
@@ -66,7 +65,6 @@ public class GeocoderServiceImpl implements GeocoderService {
     @Override
     @Cacheable("addressDTO")
     public AddressDTO reverseGeocode(CoordinatesDTO coordinatesDTO) throws ServiceException {
-        System.out.println(2);
         double longitude = coordinatesDTO.getCoordinates().get(FIRST_ELEMENT);
         double latitude = coordinatesDTO.getCoordinates().get(SECOND_ELEMENT);
         AddressDTO addressDTO;
