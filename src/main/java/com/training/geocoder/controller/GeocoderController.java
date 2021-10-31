@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class GeocoderController {
 
     @Autowired
-    GeocoderService geocoderService;
+    private GeocoderService geocoderService;
 
     @PostMapping("/coordinates")
     public AddressDTO getAddressDTO(@RequestBody CoordinatesDTO coordinates) {

@@ -6,13 +6,11 @@ import com.google.maps.errors.ApiException;
 import com.google.maps.model.AddressComponent;
 import com.google.maps.model.GeocodingResult;
 import com.google.maps.model.LatLng;
-import com.training.geocoder.entity.Location;
 import com.training.geocoder.model.AddressDTO;
 import com.training.geocoder.model.CoordinatesDTO;
-import com.training.geocoder.repository.LocationRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -33,90 +31,69 @@ public class GeocoderServiceImpl implements GeocoderService {
     private static final int LENGTH_OF_EMPTY_ARRAY = 0;
 
     @Autowired
-    private LocationRepository geocodingResultRepository;
-
-    @Autowired
     private GeoApiContext context;
 
     @Override
-    @Transactional
+    @Cacheable("coordinatesDTO")
     public CoordinatesDTO geocode(AddressDTO addressDTO) throws ServiceException {
-        Optional<Location> locationOptional = geocodingResultRepository.findFirstByFormattedAddress(addressDTO.getAddress());
-
+        System.out.println(1);
         CoordinatesDTO coordinatesDTO;
-        if (locationOptional.isPresent()) {
-            coordinatesDTO = createCoordinatesDTO(locationOptional.get());
-        } else {
-            try {
-                GeocodingResult[] results = GeocodingApi.geocode(context, addressDTO.getAddress()).language(LANGUAGE_RU).await();
-                GeocodingResult result = results[FIRST_ELEMENT];
 
-                if (result != null && result.geometry != null && result.geometry.location != null) {
-                    LatLng latLng = result.geometry.location;
+        try {
+            GeocodingResult[] results = GeocodingApi.geocode(context, addressDTO.getAddress()).language(LANGUAGE_RU).await();
 
-                    Location location = Location.builder().formattedAddress(addressDTO.getAddress())
-                            .latitude(latLng.lat).longitude(latLng.lng).build();
-                    geocodingResultRepository.save(location);
-                    coordinatesDTO = createCoordinatesDTO(location);
-
-                } else {
-                    throw new ServiceException("Geocode of geocoding API returned null");
-                }
-            } catch (InterruptedException | IOException | ApiException e) {
-                throw new ServiceException("Geocode of geocoding API communication failure");
+            if (results.length == LENGTH_OF_EMPTY_ARRAY) {
+                throw new ServiceException("The request did not encounter any errors, but returned no results");
             }
+
+            GeocodingResult result = results[FIRST_ELEMENT];
+
+            if (result != null && result.geometry != null && result.geometry.location != null) {
+                LatLng latLng = result.geometry.location;
+
+                coordinatesDTO = CoordinatesDTO.builder().coordinates(Arrays.asList(latLng.lng, latLng.lat)).build();
+
+            } else {
+                throw new ServiceException("Geocode of geocoding API returned null");
+            }
+        } catch (InterruptedException | IOException | ApiException e) {
+            throw new ServiceException("Geocode of geocoding API communication failure");
         }
+
         return coordinatesDTO;
     }
 
-    private CoordinatesDTO createCoordinatesDTO(Location location) {
-        return CoordinatesDTO.builder().coordinates(Arrays.asList(location.getLongitude(), location.getLatitude())).build();
-    }
-
     @Override
-    @Transactional
+    @Cacheable("addressDTO")
     public AddressDTO reverseGeocode(CoordinatesDTO coordinatesDTO) throws ServiceException {
-
+        System.out.println(2);
         double longitude = coordinatesDTO.getCoordinates().get(FIRST_ELEMENT);
         double latitude = coordinatesDTO.getCoordinates().get(SECOND_ELEMENT);
-
-        Optional<Location> locationOptional = geocodingResultRepository.findByLongitudeAndLatitude(longitude, latitude);
-
         AddressDTO addressDTO;
-        if (locationOptional.isPresent()) {
-            addressDTO = createAddressDTO(locationOptional.get());
-        } else {
-            try {
-                LatLng latLng = new LatLng(coordinatesDTO.getCoordinates().get(SECOND_ELEMENT),
-                        coordinatesDTO.getCoordinates().get(FIRST_ELEMENT));
 
-                GeocodingResult[] results = GeocodingApi.reverseGeocode(context, latLng).language(LANGUAGE_RU).await();
+        try {
+            LatLng latLng = new LatLng(latitude, longitude);
 
-                if (results.length == LENGTH_OF_EMPTY_ARRAY) {
-                    throw new ServiceException("The request did not encounter any errors, but returned no results");
-                }
-                GeocodingResult result = results[FIRST_ELEMENT];
+            GeocodingResult[] results = GeocodingApi.reverseGeocode(context, latLng).language(LANGUAGE_RU).await();
 
-                if (result != null) {
-                    String formattedAddress = createFormattedAddress(result);
-
-                    Location location = Location.builder().formattedAddress(formattedAddress)
-                            .latitude(latitude).longitude(longitude).build();
-                    geocodingResultRepository.save(location);
-                    addressDTO = createAddressDTO(location);
-
-                } else {
-                    throw new ServiceException("ReverseGeocode of geocoding API returned null");
-                }
-            } catch (InterruptedException | IOException | ApiException e) {
-                throw new ServiceException("ReverseGeocode of geocoding API communication failure");
+            if (results.length == LENGTH_OF_EMPTY_ARRAY) {
+                throw new ServiceException("The request did not encounter any errors, but returned no results");
             }
-        }
-        return addressDTO;
-    }
 
-    private AddressDTO createAddressDTO(Location location) {
-        return AddressDTO.builder().address(location.getFormattedAddress()).build();
+            GeocodingResult result = results[FIRST_ELEMENT];
+            if (result != null) {
+                String formattedAddress = createFormattedAddress(result);
+
+                addressDTO = AddressDTO.builder().address(formattedAddress).build();
+
+            } else {
+                throw new ServiceException("ReverseGeocode of geocoding API returned null");
+            }
+        } catch (InterruptedException | IOException | ApiException e) {
+            throw new ServiceException("ReverseGeocode of geocoding API communication failure");
+        }
+
+        return addressDTO;
     }
 
     private String createFormattedAddress(GeocodingResult result) {
